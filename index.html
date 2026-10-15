@@ -113,17 +113,26 @@
 
     #car {
       position: absolute;
-      left: 50%;
+      left: -50vw;                     /* starts off-screen to the left */
       bottom: 1vh;
       width: min(60vw, 80vh);
       transform: translateX(-50%);
+      pointer-events: none;            /* not clickable until it has parked */
+      transition: left 2s ease-out;
+    }
+
+    #car.arriving { left: 50%; }
+
+    #car.parked {
+      left: 50%;
       cursor: pointer;
+      pointer-events: auto;
     }
 
     #car img { width: 100%; height: auto; }
 
     #car.driving {
-      cursor: default;
+      left: 50%;
       transition: left 1.5s ease-in;
     }
 
@@ -215,10 +224,19 @@
     function startScene2() {
       scene1.classList.remove('active');
       scene2.classList.add('active');
+
+      // Drive the car in from the left; it stops and waits to be clicked
+      car.getBoundingClientRect();   // flush styles so the transition runs
+      car.classList.add('arriving');
+      car.addEventListener('transitionend', () => {
+        car.classList.remove('arriving');
+        car.classList.add('parked');
+      }, { once: true });
     }
 
     car.addEventListener('click', () => {
-      if (car.classList.contains('driving')) return;
+      if (!car.classList.contains('parked')) return;
+      car.classList.remove('parked');
       car.classList.add('driving');
 
       guy2.classList.add('hidden');

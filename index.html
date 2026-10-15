@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adventure 2</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    img {
+      display: block;
+      -webkit-user-drag: none;
+    }
+
+    .scene {
+      position: fixed;
+      inset: 0;
+      display: none;
+    }
+
+    .scene.active { display: block; }
+
+    .hidden { display: none !important; }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-1.5vh); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0) rotate(0); }
+      20%      { transform: translate(-0.4vh, 0.2vh) rotate(-0.6deg); }
+      40%      { transform: translate(0.4vh, -0.2vh) rotate(0.6deg); }
+      60%      { transform: translate(-0.3vh, -0.1vh) rotate(-0.4deg); }
+      80%      { transform: translate(0.3vh, 0.1vh) rotate(0.4deg); }
+    }
+
+    .bobbing  { animation: bob 2s ease-in-out infinite; }
+    .shaking  { animation: shake 0.15s linear infinite; }
+
+    /* ---------- Scene 1 ---------- */
+
+    #scene1 {
+      background: #000 url("assets/inside-scene.jpg") center / cover no-repeat;
+    }
+
+    /* Diatom guy: anchored to the left, sitting on the floor */
+    #guy {
+      position: absolute;
+      left: 8vw;
+      bottom: 4vh;
+      height: 50vh;
+      touch-action: none;
+    }
+
+    #guy img { height: 100%; width: auto; }
+
+    #guy.draggable { cursor: grab; }
+    #guy.dragging  { cursor: grabbing; z-index: 10; }
+
+    /* Hat: hat.png has a lot of transparent padding, so the wrapper crops
+       to the hat itself (bbox 222,307 -> 1181,1052 of 1423x1387). */
+    #hat {
+      position: absolute;
+      left: calc(8vw + 50vh * 1423 / 1387 / 2 - 13vh);   /* centered over guy */
+      bottom: calc(4vh + 50vh * (1387 - 231) / 1387 + 1vh); /* just above guy */
+      width: 26vh;
+      height: calc(26vh * 745 / 959);
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    #hat img {
+      position: absolute;
+      width: calc(26vh * 1423 / 959);
+      left: calc(-26vh * 222 / 959);
+      top: calc(-26vh * 307 / 959);
+    }
+
+    #door {
+      position: absolute;
+      right: 10vw;
+      bottom: 6vh;
+      height: 55vh;
+    }
+
+    /* ---------- Scene 2 ---------- */
+
+    #scene2 { background: #000; }
+
+    #house {
+      position: absolute;
+      left: 6vw;
+      bottom: 12vh;
+      height: 80vh;
+    }
+
+    #guy2 {
+      position: absolute;
+      left: calc(6vw + 80vh * 771 / 1488 / 2 - 15vh);
+      bottom: 10vh;
+      height: 30vh;
+    }
+
+    #car {
+      position: absolute;
+      left: 50%;
+      bottom: 1vh;
+      width: min(60vw, 80vh);
+      transform: translateX(-50%);
+      cursor: pointer;
+    }
+
+    #car img { width: 100%; height: auto; }
+
+    #car.driving {
+      cursor: default;
+      transition: left 1.5s ease-in;
+    }
+
+    #car.gone { left: 150vw; }
+  </style>
+</head>
+<body>
+
+  <section id="scene1" class="scene active">
+    <div id="guy"><img id="guy-img" src="assets/diatom-guy.png" alt="Diatom guy" draggable="false"></div>
+    <div id="hat" class="bobbing"><img src="assets/hat.png" alt="Hat" draggable="false"></div>
+    <img id="door" class="hidden" src="assets/door.png" alt="Door" draggable="false">
+  </section>
+
+  <section id="scene2" class="scene">
+    <img id="house" src="assets/house.png" alt="House" draggable="false">
+    <img id="guy2" class="bobbing" src="assets/diatom-guy-with-hat.png" alt="Diatom guy with hat" draggable="false">
+    <div id="car"><img id="car-img" src="assets/car.png" alt="Car" draggable="false"></div>
+  </section>
+
+  <script>
+    // Preload swap-in images so replacements don't flicker
+    ['assets/diatom-guy-with-hat.png', 'assets/car-with-driver.png'].forEach(src => {
+      new Image().src = src;
+    });
+
+    const scene1 = document.getElementById('scene1');
+    const scene2 = document.getElementById('scene2');
+    const guy    = document.getElementById('guy');
+    const guyImg = document.getElementById('guy-img');
+    const hat    = document.getElementById('hat');
+    const door   = document.getElementById('door');
+
+    // ---------- Scene 1: pick up the hat ----------
+
+    hat.addEventListener('click', () => {
+      guyImg.src = 'assets/diatom-guy-with-hat.png';
+      guyImg.alt = 'Diatom guy with hat';
+      hat.classList.add('hidden');
+      door.classList.remove('hidden');
+      guyImg.classList.add('bobbing');
+      guy.classList.add('draggable');
+    });
+
+    // ---------- Scene 1: drag the guy to the door ----------
+
+    let drag = null;
+
+    guy.addEventListener('pointerdown', e => {
+      if (!guy.classList.contains('draggable')) return;
+      e.preventDefault();
+      guy.setPointerCapture(e.pointerId);
+      drag = { startX: e.clientX, startY: e.clientY };
+      guy.classList.add('dragging');
+    });
+
+    guy.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      guy.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+
+    function endDrag() {
+      if (!drag) return;
+      drag = null;
+      guy.classList.remove('dragging');
+
+      if (overlaps(guyImg.getBoundingClientRect(), door.getBoundingClientRect())) {
+        startScene2();
+      } else {
+        guy.style.transform = '';   // snap back
+      }
+    }
+
+    guy.addEventListener('pointerup', endDrag);
+    guy.addEventListener('pointercancel', endDrag);
+
+    function overlaps(a, b) {
+      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    }
+
+    // ---------- Scene 2 ----------
+
+    const guy2   = document.getElementById('guy2');
+    const car    = document.getElementById('car');
+    const carImg = document.getElementById('car-img');
+
+    function startScene2() {
+      scene1.classList.remove('active');
+      scene2.classList.add('active');
+    }
+
+    car.addEventListener('click', () => {
+      if (car.classList.contains('driving')) return;
+      car.classList.add('driving');
+
+      guy2.classList.add('hidden');
+      carImg.src = 'assets/car-with-driver.png';
+      carImg.alt = 'Car with driver';
+      carImg.classList.add('shaking');
+
+      // After a second, slide off to the right
+      setTimeout(() => car.classList.add('gone'), 1000);
+    });
+  </script>
+</body>
+</html>
